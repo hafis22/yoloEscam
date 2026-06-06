@@ -1,16 +1,27 @@
+import os
+os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "0"
+os.environ["QT_QPA_PLATFORM"] = "offscreen"
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from ultralytics import YOLO
 from PIL import Image
 import io
+import numpy as np
 
 app = Flask(__name__)
 CORS(app)
 
-# Load model
-print("Loading YOLO model...")
-model = YOLO("best.pt")
-print("Model loaded!")
+# Load model lazy (hindari import cv2 di top-level)
+model = None
+
+def get_model():
+    global model
+    if model is None:
+        from ultralytics import YOLO
+        print("Loading YOLO model...")
+        model = YOLO("best.pt")
+        print("Model loaded!")
+    return model
 
 @app.route('/detect', methods=['POST'])
 def detect():
@@ -20,15 +31,15 @@ def detect():
     file  = request.files['foto']
     image = Image.open(io.BytesIO(file.read())).convert('RGB')
 
-    # Jalankan deteksi
-    results = model.predict(image, conf=0.5)
+    m = get_model()
+    results = m.predict(np.array(image), conf=0.5)
 
     detections = []
     for result in results:
         for box in result.boxes:
             detections.append({
-                'penyakit':    model.names[int(box.cls)],
-                'confidence':  round(float(box.conf) * 100, 1),
+                'penyakit':   m.names[int(box.cls)],
+                'confidence': round(float(box.conf) * 100, 1),
                 'bbox': {
                     'x1': round(float(box.xyxy[0][0])),
                     'y1': round(float(box.xyxy[0][1])),
@@ -37,7 +48,6 @@ def detect():
                 }
             })
 
-    # Kalau tidak ada deteksi
     if not detections:
         return jsonify({
             'penyakit':   'Tidak terdeteksi',
@@ -45,9 +55,7 @@ def detect():
             'detections': []
         })
 
-    # Ambil deteksi dengan confidence tertinggi
     best = max(detections, key=lambda x: x['confidence'])
-
     return jsonify({
         'penyakit':   best['penyakit'],
         'confidence': best['confidence'],
@@ -59,4 +67,4 @@ def health():
     return jsonify({'status': 'ok', 'model': 'vanili-disease'})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000, debug=False)
+    app.run(host='0.0.0.0', port=8080, debug=False)
