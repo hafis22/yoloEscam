@@ -1,6 +1,10 @@
 import os
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "0"
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
+# Batasi thread torch — kurangi memory footprint di Railway
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -11,17 +15,13 @@ import numpy as np
 app = Flask(__name__)
 CORS(app)
 
-# Load model lazy (hindari import cv2 di top-level)
-model = None
-
-def get_model():
-    global model
-    if model is None:
-        from ultralytics import YOLO
-        print("Loading YOLO model...")
-        model = YOLO("best.pt")
-        print("Model loaded!")
-    return model
+# Load model saat startup (bukan lazy) — lebih predictable memory
+print("Loading YOLO model...")
+from ultralytics import YOLO
+import torch
+torch.set_num_threads(1)  # paksa single thread — hemat RAM
+model = YOLO("best.pt")
+print("Model loaded!")
 
 @app.route('/detect', methods=['POST'])
 def detect():
@@ -31,14 +31,19 @@ def detect():
     file  = request.files['foto']
     image = Image.open(io.BytesIO(file.read())).convert('RGB')
 
-    m = get_model()
-    results = m.predict(np.array(image), conf=0.5)
+    # Resize ke max 416x416 sebelum inference — kurangi RAM saat inference
+    MAX_SIZE = 416
+    if image.width > MAX_SIZE or image.height > MAX_SIZE:
+        image.thumbnail((MAX_SIZE, MAX_SIZE), Image.LANCZOS)
+
+    # imgsz eksplisit 320 — lebih ringan dari default 640
+    results = model.predict(np.array(image), conf=0.4, imgsz=320, verbose=False)
 
     detections = []
     for result in results:
         for box in result.boxes:
             detections.append({
-                'penyakit':   m.names[int(box.cls)],
+                'penyakit':   model.names[int(box.cls)],
                 'confidence': round(float(box.conf) * 100, 1),
                 'bbox': {
                     'x1': round(float(box.xyxy[0][0])),

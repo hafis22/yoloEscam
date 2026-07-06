@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["libGL", "libglib2", "libxcb", "xorg.libX11", "xorg.libXext"]
+
+[phases.install]
+cmds = ["pip install --no-cache-dir -r requirements.txt"]
+
+[start]
+cmd = "gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 180 --keep-alive 5 --max-requests 100 --max-requests-jitter 10 --preload"
