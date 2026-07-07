@@ -37,7 +37,7 @@ def detect():
         image.thumbnail((MAX_SIZE, MAX_SIZE), Image.LANCZOS)
 
     # imgsz eksplisit 320 — lebih ringan dari default 640
-    results = model.predict(np.array(image), conf=0.25, imgsz=320, verbose=False)
+    results = model.predict(np.array(image), conf=0.1, imgsz=320, verbose=False)
 
     detections = []
     for result in results:
@@ -57,14 +57,15 @@ def detect():
         return jsonify({
             'penyakit':   'Tidak terdeteksi',
             'confidence': 0,
-            'detections': []
+            'detections': [],
+            'debug': 'no detections above threshold'
         })
 
     best = max(detections, key=lambda x: x['confidence'])
     return jsonify({
         'penyakit':   best['penyakit'],
         'confidence': best['confidence'],
-        'detections': detections
+        'detections': detections  # semua deteksi — untuk debug
     })
 
 @app.route('/health', methods=['GET'])
