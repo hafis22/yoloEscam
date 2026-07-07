@@ -37,7 +37,7 @@ def detect():
         image.thumbnail((MAX_SIZE, MAX_SIZE), Image.LANCZOS)
 
     # imgsz eksplisit 320 — lebih ringan dari default 640
-    results = model.predict(np.array(image), conf=0.4, imgsz=320, verbose=False)
+    results = model.predict(np.array(image), conf=0.25, imgsz=320, verbose=False)
 
     detections = []
     for result in results:
@@ -69,7 +69,11 @@ def detect():
 
 @app.route('/health', methods=['GET'])
 def health():
-    return jsonify({'status': 'ok', 'model': 'vanili-disease'})
+    return jsonify({
+        'status': 'ok',
+        'model': 'vanili-disease',
+        'classes': model.names  # tampilkan nama kelas model
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=False)
