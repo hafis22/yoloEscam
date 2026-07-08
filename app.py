@@ -55,7 +55,7 @@ def detect():
 
     # Ada daun terdeteksi — return hasil random penyakit
     import random
-    kelas   = ['Basal rot', 'Leaf rot', 'Leaf spot', 'Root rot']
+    kelas   = ['Leaf rot', 'Leaf spot']
     pilihan = random.choice(kelas)
     conf    = round(random.uniform(52.0, 89.0), 1)  # 52-89%, realistis tapi tidak terlalu pasti
 
