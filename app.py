@@ -20,7 +20,7 @@ print("Loading YOLO model...")
 from ultralytics import YOLO
 import torch
 torch.set_num_threads(1)  # paksa single thread — hemat RAM
-model = YOLO("best.pt")
+model = YOLO("yolov8n.pt")
 print("Model loaded!")
 
 @app.route('/detect', methods=['POST'])
