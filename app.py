@@ -20,7 +20,8 @@ print("Loading YOLO model...")
 from ultralytics import YOLO
 import torch
 torch.set_num_threads(1)  # paksa single thread — hemat RAM
-model = YOLO("yolov8n.pt")
+model = YOLO("best.pt")
+print("Model loaded!")
 print("Model loaded!")
 
 @app.route('/detect', methods=['POST'])
@@ -31,38 +32,28 @@ def detect():
     file  = request.files['foto']
     image = Image.open(io.BytesIO(file.read())).convert('RGB')
 
-    # Resize sebelum inference
     MAX_SIZE = 416
     if image.width > MAX_SIZE or image.height > MAX_SIZE:
         image.thumbnail((MAX_SIZE, MAX_SIZE), Image.LANCZOS)
 
-    # Jalankan YOLO untuk cek apakah ada daun/objek terdeteksi
-    results = model.predict(np.array(image), conf=0.1, imgsz=320, verbose=False)
+    results = model.predict(np.array(image), conf=0.25, imgsz=320, verbose=False)
 
-    ada_deteksi = False
+    detections = []
     for result in results:
-        if len(result.boxes) > 0:
-            ada_deteksi = True
-            break
+        for box in result.boxes:
+            detections.append({
+                'penyakit':   model.names[int(box.cls)],
+                'confidence': round(float(box.conf) * 100, 1),
+            })
 
-    if not ada_deteksi:
-        # Tidak ada daun/objek terdeteksi
-        return jsonify({
-            'penyakit':   'Tidak terdeteksi',
-            'confidence': 0,
-            'detections': []
-        })
+    if not detections:
+        return jsonify({'penyakit': 'Tidak terdeteksi', 'confidence': 0, 'detections': []})
 
-    # Ada daun terdeteksi — return hasil random penyakit
-    import random
-    kelas   = ['Basal rot', 'Leaf rot', 'Leaf spot']
-    pilihan = random.choice(kelas)
-    conf    = round(random.uniform(52.0, 89.0), 1)  # 52-89%, realistis tapi tidak terlalu pasti
-
+    best = max(detections, key=lambda x: x['confidence'])
     return jsonify({
-        'penyakit':   pilihan,
-        'confidence': conf,
-        'detections': [{'penyakit': pilihan, 'confidence': conf}]
+        'penyakit':   best['penyakit'],
+        'confidence': best['confidence'],
+        'detections': detections
     })
 
 @app.route('/health', methods=['GET'])
